@@ -44,15 +44,15 @@ interface MusicTrack {
 
 const musicTracks: MusicTrack[] = [
   { id: '1', title: 'Imperial March', artist: 'John Williams', duration: '3:02', category: 'epic', url: '/assets/Imperial-March.mp3' },
-  { id: '2', title: 'Duel of the Fates', artist: 'John Williams', duration: '4:14', category: 'epic', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
-  { id: '3', title: 'The Force Theme', artist: 'John Williams', duration: '5:12', category: 'ambient', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
-  { id: '4', title: 'Dark Side Meditation', artist: 'Sith Academy', duration: '8:30', category: 'dark', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
-  { id: '5', title: 'Binary Sunset', artist: 'John Williams', duration: '2:46', category: 'ambient', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
-  { id: '6', title: 'Cantina Band', artist: 'John Williams', duration: '2:46', category: 'focus', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
-  { id: '7', title: 'Vader\'s Theme', artist: 'John Williams', duration: '3:15', category: 'dark', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
-  { id: '8', title: 'Jedi Temple March', artist: 'John Williams', duration: '4:02', category: 'focus', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
-  { id: '9', title: 'Throne Room', artist: 'John Williams', duration: '5:41', category: 'epic', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
-  { id: '10', title: 'Asteroid Field', artist: 'John Williams', duration: '4:18', category: 'ambient', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' }
+  { id: '2', title: 'Duel of the Fates', artist: 'John Williams', duration: '4:14', category: 'epic', url: '/assets/duel.mp3' },
+  { id: '3', title: 'The Force Theme', artist: 'John Williams', duration: '5:12', category: 'ambient', url: '/assets/force.mp3' },
+  { id: '4', title: 'Dark Side Meditation', artist: 'Sith Academy', duration: '8:30', category: 'dark', url: '/assets/meditation.mp3' },
+  { id: '5', title: 'Binary Sunset', artist: 'John Williams', duration: '2:46', category: 'ambient', url: '/assets/sunset.mp3' },
+  { id: '6', title: 'Cantina Band', artist: 'John Williams', duration: '2:46', category: 'focus', url: '/assets/cantina.mp3' },
+  { id: '7', title: 'Vader\'s Theme', artist: 'John Williams', duration: '3:15', category: 'dark', url: '/assets/Imperial-March.mp3' },
+  { id: '8', title: 'Jedi Temple March', artist: 'John Williams', duration: '4:02', category: 'focus', url: '/assets/temple.mp3' },
+  { id: '9', title: 'Throne Room', artist: 'John Williams', duration: '5:41', category: 'epic', url: '/assets/newhope.mp3' },
+  { id: '10', title: 'Asteroid Field', artist: 'John Williams', duration: '4:18', category: 'ambient', url: '/assets/empire.mp3' }
 ];
 
 export function PomodoroSidebar({ isOpen, onClose }: PomodoroSidebarProps) {

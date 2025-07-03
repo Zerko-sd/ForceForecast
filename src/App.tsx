@@ -13,6 +13,8 @@ import { generateContent, getDefaultPrompt } from './utils/generator';
 import { savePlan, exportPlans, exportPlanAsText } from './utils/storage';
 import { DailyPlan, GeneratedContent } from './types';
 import { Skull, MessageSquare, Gamepad2, Calendar as CalendarIcon, Timer } from 'lucide-react';
+import DarthVader from './components/icons/DarthVader';
+import yodaImg from '../public/assets/yoda.png'; // Will work with Vite/CRA, else use <img src="/assets/yoda.png" />
 
 function App() {
   const [isLoading, setIsLoading] = useState(false);
@@ -23,6 +25,8 @@ function App() {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isPomodoroOpen, setIsPomodoroOpen] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [lightsaberCursor, setLightsaberCursor] = useState(false);
+  const [yodaMode, setYodaMode] = useState(false);
 
   const handlePromptSubmit = async (prompt: string) => {
     setIsLoading(true);
@@ -181,8 +185,70 @@ function App() {
     />
   ));
 
+  useEffect(() => {
+    if (lightsaberCursor) {
+      document.body.classList.add('lightsaber-cursor');
+    } else {
+      document.body.classList.remove('lightsaber-cursor');
+    }
+    return () => {
+      document.body.classList.remove('lightsaber-cursor');
+    };
+  }, [lightsaberCursor]);
+
+  // Konami code logic
+  useEffect(() => {
+    const konami = [
+      'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
+      'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight',
+      'b', 'a'
+    ];
+    let keyBuffer: string[] = [];
+    const onKeyDown = (e: KeyboardEvent) => {
+      keyBuffer.push(e.key);
+      if (keyBuffer.length > konami.length) keyBuffer.shift();
+      if (keyBuffer.join(',') === konami.join(',')) {
+        setYodaMode((v) => !v);
+        keyBuffer = [];
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  // Yoda-speak transformation (placeholder)
+  function toYodaSpeak(text: string): string {
+    if (!yodaMode) return text;
+    // Simple fake Yoda-speak: reverse word order
+    return text.split(' ').reverse().join(' ');
+  }
+
   return (
     <div className="min-h-screen relative overflow-hidden">
+      {/* Yoda Easter Egg */}
+      {yodaMode && (
+        <img
+          src={yodaImg}
+          alt="Yoda"
+          style={{
+            position: 'fixed',
+            bottom: -48,
+            right: -24,
+            width: 220,
+            zIndex: 10001,
+            filter: 'drop-shadow(0 0 32px #a3e635)',
+            transition: 'all 0.5s cubic-bezier(.4,2,.6,1)',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      {/* Secret clickable spot for lightsaber cursor */}
+      <div
+        style={{ position: 'fixed', top: 0, left: 0, width: 32, height: 32, zIndex: 10000, opacity: 0.01, cursor: 'pointer' }}
+        title="The Force is strong here..."
+        onClick={() => setLightsaberCursor((v) => !v)}
+        aria-label="Activate the Force"
+      />
       {/* Futuristic Star Wars Background */}
       <div className="fixed inset-0 bg-gradient-to-br from-black via-gray-900 to-red-950/20">
         
@@ -531,7 +597,7 @@ function App() {
                 scale: { duration: 2, repeat: Infinity, ease: "easeInOut" }
               }}
             >
-              <Skull className="w-12 h-12 text-red-500" />
+              <DarthVader className="w-12 h-12 text-red-500" />
             </motion.div>
             <motion.h1 
               className="text-4xl md:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-red-300 tracking-wider"
@@ -556,7 +622,7 @@ function App() {
                 scale: { duration: 2, repeat: Infinity, ease: "easeInOut", delay: 1 }
               }}
             >
-              <Skull className="w-12 h-12 text-red-500" />
+              <DarthVader className="w-12 h-12 text-red-500" />
             </motion.div>
           </motion.div>
           <motion.p 
@@ -653,7 +719,7 @@ function App() {
                     animate={{ rotate: 360 }}
                     transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                   >
-                    <Skull className="w-16 h-16 text-red-500 mx-auto mb-4" />
+                    <DarthVader className="w-16 h-16 text-red-500 mx-auto mb-4" />
                   </motion.div>
                   <motion.p 
                     className="text-red-300 text-lg font-medium mb-2"
@@ -713,7 +779,7 @@ function App() {
                       ease: "easeInOut"
                     }}
                   >
-                    <Skull className="w-16 h-16 text-red-500/50 mx-auto mb-4" />
+                    <DarthVader className="w-16 h-16 text-red-500/50 mx-auto mb-4" />
                   </motion.div>
                   <motion.p 
                     className="text-red-300 text-lg font-medium mb-2"

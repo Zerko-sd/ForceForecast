@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, Target, Clock, Flame, Skull, Eye } from 'lucide-react';
 import { DailyPlan, CalendarEvent } from '../types';
 import { getPlans, getCalendarEvents, saveCalendarEvent, deleteCalendarEvent } from '../utils/storage';
+import DarthVader from './icons/DarthVader';
 
 interface CalendarProps {
   isOpen: boolean;
@@ -299,7 +300,7 @@ export function Calendar({ isOpen, onClose, currentPlan }: CalendarProps) {
                 {selectedDatePlan && (
                   <div className="bg-purple-950/30 border border-purple-700/30 rounded-md p-4">
                     <h4 className="text-purple-400 font-bold mb-2 flex items-center gap-2">
-                      <Skull className="w-4 h-4" />
+                      <DarthVader className="w-4 h-4" />
                       FORCE FORECAST PLAN
                     </h4>
                     <p className="text-gray-300 text-sm mb-2">{selectedDatePlan.prompt}</p>
