@@ -22,6 +22,10 @@ Force Forecast is a comprehensive productivity suite that transforms mundane dai
 - 🌌 **Interactive Galaxy Map** - 3D Star Wars universe with character exploration
 - 🎮 **Gamified Experience** - Turn productivity into an epic adventure
 
+### Easter Eggs:
+- Try out **konami code**
+- click on the top-left side for a light saber cursor
+
 ## 🛠️ Tech Stack
 
 ### Frontend
