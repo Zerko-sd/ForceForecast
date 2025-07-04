@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
@@ -30,27 +30,43 @@ const TIMELINE = [
 
 export const TimelineSlider: React.FC = () => {
   const [selected, setSelected] = useState(11); // Start at A New Hope
-  const [dragY, setDragY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
   const navigate = useNavigate();
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Slider logic
-  const min = 0;
-  const max = TIMELINE.length - 1;
-  const sliderHeight = 600; // Increased for a longer slider
-  const step = sliderHeight / (TIMELINE.length - 1);
-
-  // Snap to nearest checkpoint
-  const handleDrag = (_event: any, info: { point: { y: number } }) => {
-    let idx = Math.round(info.point.y / step);
-    idx = Math.max(min, Math.min(max, idx));
-    setSelected(idx);
-    setDragY(idx * step);
-  };
+  const timelineHeight = 560;
+  const step = timelineHeight / (TIMELINE.length - 1);
 
   // Click on checkpoint
   const handleCheckpointClick = (idx: number) => {
     setSelected(idx);
-    setDragY(idx * step);
+  };
+
+  // Handle drag on the timeline area
+  const handleTimelineDrag = (e: React.MouseEvent) => {
+    if (!containerRef.current) return;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const relativeY = e.clientY - rect.top - 8; // 8px offset from top
+    const clampedY = Math.max(0, Math.min(timelineHeight, relativeY));
+    const newIndex = Math.round(clampedY / step);
+    const clampedIndex = Math.max(0, Math.min(TIMELINE.length - 1, newIndex));
+    
+    setSelected(clampedIndex);
+  };
+
+  const handleMouseDown = () => {
+    setIsDragging(true);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isDragging) {
+      handleTimelineDrag(e);
+    }
   };
 
   return (
@@ -77,64 +93,77 @@ export const TimelineSlider: React.FC = () => {
           Discover the Saga of Star Wars
         </div>
       </div>
-      <motion.div
-        className="relative flex flex-col items-center"
-        style={{ minHeight: sliderHeight + 40, height: sliderHeight + 40 }}
+      
+      {/* Draggable timeline area */}
+      <div 
+        ref={containerRef}
+        className="relative flex flex-col items-center cursor-pointer" 
+        style={{ minHeight: 600 }}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onMouseMove={handleMouseMove}
       >
-        {/* Vertical slider track - clean, no glow */}
+        {/* Vertical line */}
         <div
           className="absolute left-1/2 top-8 bottom-8 w-2 bg-gray-800 border border-yellow-400"
-          style={{ transform: 'translateX(-50%)', height: sliderHeight, borderRadius: 8, opacity: 0.85 }}
+          style={{ transform: 'translateX(-50%)', height: timelineHeight, borderRadius: 8, opacity: 0.85 }}
         />
-        {/* Checkpoints */}
-        {TIMELINE.map((point, idx) => (
-          <div
-            key={point.label}
-            className="absolute left-1/2"
-            style={{
-              top: 8 + idx * step,
-              transform: 'translateX(-50%)',
-              zIndex: 10,
-              cursor: 'pointer',
-            }}
-            onClick={() => handleCheckpointClick(idx)}
-          >
+        
+        {/* Timeline points */}
+        {TIMELINE.map((point, idx) => {
+          const position = (idx / (TIMELINE.length - 1)) * timelineHeight;
+          return (
             <div
+              key={point.label}
+              className="absolute left-1/2 cursor-pointer"
               style={{
-                width: 22,
-                height: 22,
-                borderRadius: '50%',
-                background: idx === selected ? '#ffe81f' : '#222',
-                border: idx === selected ? '3px solid #ffe81f' : '2px solid #888',
-                boxShadow: idx === selected ? '0 0 0 2px #181a22' : 'none',
-                transition: 'all 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                top: 8 + position,
+                transform: 'translateX(-50%)',
+                zIndex: 10,
               }}
+              onClick={() => handleCheckpointClick(idx)}
             >
               <div
                 style={{
-                  width: 10,
-                  height: 10,
+                  width: 22,
+                  height: 22,
                   borderRadius: '50%',
-                  background: idx === selected ? '#ffe81f' : '#888',
+                  background: idx === selected ? '#ffe81f' : '#222',
+                  border: idx === selected ? '3px solid #ffe81f' : '2px solid #888',
+                  boxShadow: idx === selected ? '0 0 0 2px #181a22' : 'none',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
-              />
+              >
+                <div
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: '50%',
+                    background: idx === selected ? '#ffe81f' : '#888',
+                  }}
+                />
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
+        
         {/* Draggable handle */}
         <motion.div
-          drag="y"
-          dragConstraints={{ top: 0, bottom: sliderHeight }}
-          dragElastic={0.12}
-          onDrag={handleDrag}
-          style={{ y: dragY, zIndex: 20 }}
-          className="absolute left-1/2 w-12 h-12 rounded-full flex items-center justify-center border-2 cursor-pointer bg-gray-900 border-yellow-400"
-          initial={{ y: selected * step }}
-          animate={{ y: dragY }}
-          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          className="absolute left-1/2 w-12 h-12 rounded-full flex items-center justify-center border-2 bg-gray-900 border-yellow-400 cursor-grab active:cursor-grabbing"
+          style={{
+            top: 8 + (selected / (TIMELINE.length - 1)) * timelineHeight,
+            transform: 'translateX(-50%)',
+            zIndex: 20,
+          }}
+          animate={{
+            scale: isDragging ? 1.1 : 1,
+            boxShadow: isDragging ? '0 0 20px rgba(255, 232, 31, 0.5)' : '0 0 10px rgba(255, 232, 31, 0.3)',
+          }}
+          transition={{ duration: 0.2 }}
         >
           <span
             style={{
@@ -148,7 +177,8 @@ export const TimelineSlider: React.FC = () => {
             {TIMELINE[selected].label[0]}
           </span>
         </motion.div>
-        {/* Popout detail card above handle */}
+        
+        {/* Detail card */}
         <AnimatePresence>
           <motion.div
             key={selected}
@@ -170,7 +200,8 @@ export const TimelineSlider: React.FC = () => {
             <div className="text-sm mb-1" style={{ color: '#fff', fontFamily: 'inherit', opacity: 0.95 }}>{TIMELINE[selected].details}</div>
           </motion.div>
         </AnimatePresence>
-      </motion.div>
+      </div>
+      
       {/* Go to Map button */}
       <div className="mt-10 flex flex-col items-center">
         <div style={{
@@ -199,6 +230,14 @@ export const TimelineSlider: React.FC = () => {
             marginTop: 4,
             transition: 'all 0.2s',
             textShadow: '0 0 8px #dc2626, 0 0 16px #fff',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.05)';
+            e.currentTarget.style.boxShadow = '0 0 32px 8px #dc2626, 0 0 64px 16px #dc2626aa';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = '0 0 24px 4px #dc2626, 0 0 48px 8px #dc2626aa';
           }}
         >
           LAUNCH GALAXY MAP

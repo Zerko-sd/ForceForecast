@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import * as THREE from 'three';
-import { OrbitControls } from 'three-stdlib';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 const SPHERE_RADIUS = 30;
 const STAR_COUNT = 4000;
@@ -177,10 +178,8 @@ const CHARACTERS = [
 
 const fallbackImg = '/assets/yoda.png';
 
-// Function to generate a Star Wars-style sphere SVG path with grid overlay
+// Function to generate a Star Wars-style sphere SVG path with grid overlay and soft glow
 function getSphereSVGPath(color: string, glowColor?: string) {
-  // SVG markup for a sphere with grid lines and glow
-  // Uses a circle, radial gradient, and grid lines
   const gradientId = `grad-${color.replace('#', '')}`;
   return `
     <svg width="128" height="128" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -188,10 +187,10 @@ function getSphereSVGPath(color: string, glowColor?: string) {
         <radialGradient id="${gradientId}" cx="50%" cy="50%" r="50%">
           <stop offset="0%" stop-color="#fff" stop-opacity="0.9"/>
           <stop offset="60%" stop-color="${color}" stop-opacity="0.7"/>
-          <stop offset="100%" stop-color="${color}" stop-opacity="1"/>
+          <stop offset="100%" stop-color="${glowColor || color}" stop-opacity="0.0"/>
         </radialGradient>
         <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+          <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
           <feMerge>
             <feMergeNode in="coloredBlur"/>
             <feMergeNode in="SourceGraphic"/>
@@ -199,7 +198,10 @@ function getSphereSVGPath(color: string, glowColor?: string) {
         </filter>
       </defs>
       <circle cx="12" cy="12" r="10" fill="url(#${gradientId})" filter="url(#glow)" />
-      <g stroke="#fff" stroke-width="0.5" opacity="0.25">
+      <circle cx="12" cy="12" r="7" fill="#fff" opacity="0.12" />
+      <circle cx="12" cy="12" r="5" fill="#fff" opacity="0.18" />
+      <circle cx="12" cy="12" r="3" fill="#fff" opacity="0.25" />
+      <g stroke="#fff" stroke-width="0.5" opacity="0.18">
         <ellipse cx="12" cy="12" rx="10" ry="3" />
         <ellipse cx="12" cy="12" rx="10" ry="6" />
         <ellipse cx="12" cy="12" rx="10" ry="9" />
@@ -216,174 +218,354 @@ function createSVGTextureWithGrid(color: string, glowColor?: string) {
   const svgMarkup = getSphereSVGPath(color, glowColor);
   const svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(svgBlob);
-  const texture = new THREE.TextureLoader().load(url);
-  texture.needsUpdate = true;
+  const texture = new THREE.TextureLoader().load(url, () => {
+    texture.needsUpdate = true;
+  });
   return texture;
 }
 
 const GalaxyMap: React.FC = () => {
   const mountRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
   const [hovered, setHovered] = useState<string | null>(null);
   const [hoveredPosition, setHoveredPosition] = useState<{ x: number; y: number } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000000);
+    if (!mountRef.current) return;
 
-    // Starfield
-    const starGeometry = new THREE.BufferGeometry();
-    const starVertices = [];
-    for (let i = 0; i < STAR_COUNT; i++) {
-      const theta = 2 * Math.PI * Math.random();
-      const phi = Math.acos(2 * Math.random() - 1);
-      const r = 200 + Math.random() * 200;
-      starVertices.push(
-        r * Math.sin(phi) * Math.cos(theta),
-        r * Math.sin(phi) * Math.sin(theta),
-        r * Math.cos(phi)
-      );
-    }
-    starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
-    const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 1.2 });
-    const stars = new THREE.Points(starGeometry, starMaterial);
-    scene.add(stars);
+    try {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x000000);
 
-    // Sphere (the map)
-    const sphereGeometry = new THREE.SphereGeometry(SPHERE_RADIUS, 64, 64);
-    const sphereMaterial = new THREE.MeshPhongMaterial({
-      color: 0x181a22,
-      shininess: 30,
-      specular: 0x222244,
-      flatShading: false,
-      transparent: true,
-      opacity: 0.97,
-    });
-    const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-    scene.add(sphere);
-
-    // Sphere blue glow
-    const glowGeometry = new THREE.SphereGeometry(SPHERE_RADIUS * 1.04, 64, 64);
-    const glowMaterial = new THREE.MeshBasicMaterial({ color: 0x7ec0ee, transparent: true, opacity: 0.13 });
-    const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-    scene.add(glow);
-
-    // Lighting
-    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-    const pointLight = new THREE.PointLight(0xffffff, 1.2, 400);
-    pointLight.position.set(0, 0, SPHERE_RADIUS * 3);
-    scene.add(pointLight);
-
-    // Character Sprites with SVG
-    const spriteMeshes: THREE.Sprite[] = [];
-    CHARACTERS.forEach(char => {
-      const lat = typeof char.lat === 'number' ? char.lat : 0;
-      const lon = typeof char.lon === 'number' ? char.lon : 0;
-      const phi = (90 - lat) * (Math.PI / 180);
-      const theta = (lon + 180) * (Math.PI / 180);
-      const x = SPHERE_RADIUS * Math.sin(phi) * Math.cos(theta);
-      const y = SPHERE_RADIUS * Math.cos(phi) + 3;
-      const z = SPHERE_RADIUS * Math.sin(phi) * Math.sin(theta);
-      if (char.color) {
-        const texture = createSVGTextureWithGrid(char.color, char.glowColor);
-        const material = new THREE.SpriteMaterial({ map: texture, color: 0xffffff, transparent: true, opacity: 0.95 });
-        const sprite = new THREE.Sprite(material);
-        sprite.position.set(x, y, z);
-        sprite.scale.set(6, 6, 1);
-        sprite.userData = char;
-        scene.add(sprite);
-        spriteMeshes.push(sprite);
-      }
-    });
-
-    // Camera
-    const camera = new THREE.PerspectiveCamera(70, width / height, 0.1, 1000);
-    camera.position.z = SPHERE_RADIUS * 2.2;
-
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(width, height);
-    if (mountRef.current) {
-      mountRef.current.appendChild(renderer.domElement);
-    }
-
-    // OrbitControls
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
-    controls.enablePan = true;
-    controls.minDistance = SPHERE_RADIUS * 1.2;
-    controls.maxDistance = SPHERE_RADIUS * 6;
-    controls.autoRotate = false;
-
-    // Raycaster for hover/click
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-    function onPointerMove(e: MouseEvent) {
-      const rect = renderer.domElement.getBoundingClientRect();
-      mouse.x = ((e.clientX - rect.left) / width) * 2 - 1;
-      mouse.y = -((e.clientY - rect.top) / height) * 2 + 1;
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(spriteMeshes);
-      if (intersects.length > 0) {
-        const obj = intersects[0].object as THREE.Sprite;
-        setHovered(obj.userData.name);
-        setHoveredPosition({ x: e.clientX, y: e.clientY });
-        // Pop out and glow effect for hovered sprite
-        spriteMeshes.forEach(sprite => {
-          if (sprite.userData.name === obj.userData.name) {
-            sprite.scale.set(8, 8, 1);
-            (sprite.material as THREE.SpriteMaterial).opacity = 1.0;
-          } else {
-            sprite.scale.set(6, 6, 1);
-            (sprite.material as THREE.SpriteMaterial).opacity = 0.95;
-          }
-        });
-      } else {
-        setHovered(null);
-        setHoveredPosition(null);
-        // Reset all sprites
-        spriteMeshes.forEach(sprite => {
-          sprite.scale.set(6, 6, 1);
-          (sprite.material as THREE.SpriteMaterial).opacity = 0.95;
-        });
-      }
-    }
-    renderer.domElement.addEventListener('mousemove', onPointerMove);
-
-    // Animate
-    let t = 0;
-    function animate() {
-      requestAnimationFrame(animate);
-      controls.update();
-      t += 0.01;
-      // Animate starfield: drift
-      const positions = starGeometry.attributes.position.array;
+      // Starfield
+      const starGeometry = new THREE.BufferGeometry();
+      const starVertices = [];
       for (let i = 0; i < STAR_COUNT; i++) {
-        positions[i * 3 + 0] += Math.sin(t + i) * 0.002;
-        positions[i * 3 + 1] += Math.cos(t + i) * 0.002;
+        const theta = 2 * Math.PI * Math.random();
+        const phi = Math.acos(2 * Math.random() - 1);
+        const r = 200 + Math.random() * 200;
+        starVertices.push(
+          r * Math.sin(phi) * Math.cos(theta),
+          r * Math.sin(phi) * Math.sin(theta),
+          r * Math.cos(phi)
+        );
       }
-      starGeometry.attributes.position.needsUpdate = true;
-      renderer.render(scene, camera);
-    }
-    animate();
+      starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+      const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 1.2 });
+      const stars = new THREE.Points(starGeometry, starMaterial);
+      scene.add(stars);
 
-    return () => {
-      renderer.dispose();
+      // Sphere (the map) - make it more visible
+      const sphereGeometry = new THREE.SphereGeometry(SPHERE_RADIUS, 64, 64);
+      const sphereMaterial = new THREE.MeshPhongMaterial({
+        color: 0x1a1a2e,
+        shininess: 30,
+        specular: 0x444466,
+        flatShading: false,
+        transparent: true,
+        opacity: 0.9,
+      });
+      const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+      scene.add(sphere);
+
+      // Sphere blue glow - make it more prominent
+      const glowGeometry = new THREE.SphereGeometry(SPHERE_RADIUS * 1.05, 64, 64);
+      const glowMaterial = new THREE.MeshBasicMaterial({ color: 0x7ec0ee, transparent: true, opacity: 0.2 });
+      const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+      scene.add(glow);
+
+      // Additional outer glow
+      const outerGlowGeometry = new THREE.SphereGeometry(SPHERE_RADIUS * 1.1, 64, 64);
+      const outerGlowMaterial = new THREE.MeshBasicMaterial({ color: 0x7ec0ee, transparent: true, opacity: 0.1 });
+      const outerGlow = new THREE.Mesh(outerGlowGeometry, outerGlowMaterial);
+      scene.add(outerGlow);
+
+      // Lighting - improve visibility
+      scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+      const pointLight = new THREE.PointLight(0xffffff, 1.5, 400);
+      pointLight.position.set(0, 0, SPHERE_RADIUS * 3);
+      scene.add(pointLight);
+
+      // Add directional light for better character visibility
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+      directionalLight.position.set(SPHERE_RADIUS * 2, SPHERE_RADIUS * 2, SPHERE_RADIUS * 2);
+      scene.add(directionalLight);
+
+      // Character Sprites with SVG - improved positioning and visibility
+      const spriteMeshes: THREE.Sprite[] = [];
+      CHARACTERS.forEach(char => {
+        const lat = typeof char.lat === 'number' ? char.lat : 0;
+        const lon = typeof char.lon === 'number' ? char.lon : 0;
+        
+        // Convert lat/lon to 3D coordinates on sphere surface
+        const phi = (90 - lat) * (Math.PI / 180);
+        const theta = (lon + 180) * (Math.PI / 180);
+        
+        // Calculate position on sphere surface with offset to ensure sprites hover above the sphere
+        const offset = 4.0; // Set offset to 4 for moderate separation
+        const x = (SPHERE_RADIUS + offset) * Math.sin(phi) * Math.cos(theta);
+        const y = (SPHERE_RADIUS + offset) * Math.cos(phi);
+        const z = (SPHERE_RADIUS + offset) * Math.sin(phi) * Math.sin(theta);
+        
+        if (char.color) {
+          const texture = createSVGTextureWithGrid(char.color, char.glowColor);
+          const material = new THREE.SpriteMaterial({ 
+            map: texture, 
+            color: 0xffffff, 
+            transparent: true, 
+            opacity: 1.0,
+            sizeAttenuation: true
+          });
+          const sprite = new THREE.Sprite(material);
+          sprite.position.set(x, y, z);
+          sprite.scale.set(5, 5, 1); // Smaller, more distinct
+          sprite.userData = char;
+          scene.add(sprite);
+          spriteMeshes.push(sprite);
+        }
+      });
+
+      // Camera - adjust for better view
+      const camera = new THREE.PerspectiveCamera(70, width / height, 0.1, 1000);
+      camera.position.z = SPHERE_RADIUS * 2.5;
+
+      // Renderer
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(window.devicePixelRatio);
       if (mountRef.current) {
-        mountRef.current.innerHTML = '';
+        mountRef.current.appendChild(renderer.domElement);
       }
-      renderer.domElement.removeEventListener('mousemove', onPointerMove);
-    };
+
+      // OrbitControls
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.08;
+      controls.enablePan = true;
+      controls.minDistance = SPHERE_RADIUS * 1.5;
+      controls.maxDistance = SPHERE_RADIUS * 8;
+      controls.autoRotate = false;
+
+      // Raycaster for hover/click
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+      
+      function onPointerMove(e: MouseEvent) {
+        const rect = renderer.domElement.getBoundingClientRect();
+        mouse.x = ((e.clientX - rect.left) / width) * 2 - 1;
+        mouse.y = -((e.clientY - rect.top) / height) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(spriteMeshes);
+        if (intersects.length > 0) {
+          const obj = intersects[0].object as THREE.Sprite;
+          setHovered(obj.userData.name);
+          setHoveredPosition({ x: e.clientX, y: e.clientY });
+          // Pop out effect for hovered sprite
+          spriteMeshes.forEach(sprite => {
+            if (sprite.userData.name === obj.userData.name) {
+              sprite.scale.set(8, 8, 1); // Make hovered sprite larger
+              (sprite.material as THREE.SpriteMaterial).opacity = 1.0;
+            } else {
+              sprite.scale.set(5, 5, 1);
+              (sprite.material as THREE.SpriteMaterial).opacity = 0.9;
+            }
+          });
+        } else {
+          setHovered(null);
+          setHoveredPosition(null);
+          // Reset all sprites
+          spriteMeshes.forEach(sprite => {
+            sprite.scale.set(5, 5, 1);
+            (sprite.material as THREE.SpriteMaterial).opacity = 0.9;
+          });
+        }
+      }
+      
+      renderer.domElement.addEventListener('mousemove', onPointerMove);
+
+      // Handle window resize
+      const handleResize = () => {
+        const newWidth = window.innerWidth;
+        const newHeight = window.innerHeight;
+        camera.aspect = newWidth / newHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(newWidth, newHeight);
+      };
+      window.addEventListener('resize', handleResize);
+
+      // Animate
+      let t = 0;
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        t += 0.01;
+        // Animate starfield: drift
+        const positions = starGeometry.attributes.position.array;
+        for (let i = 0; i < STAR_COUNT; i++) {
+          positions[i * 3 + 0] += Math.sin(t + i) * 0.002;
+          positions[i * 3 + 1] += Math.cos(t + i) * 0.002;
+        }
+        starGeometry.attributes.position.needsUpdate = true;
+        renderer.render(scene, camera);
+      }
+      
+      animate();
+      setIsLoading(false);
+
+      return () => {
+        renderer.dispose();
+        if (mountRef.current) {
+          mountRef.current.innerHTML = '';
+        }
+        renderer.domElement.removeEventListener('mousemove', onPointerMove);
+        window.removeEventListener('resize', handleResize);
+      };
+    } catch (err) {
+      console.error('Error initializing GalaxyMap:', err);
+      setError('Failed to load the galaxy map. Please refresh the page.');
+      setIsLoading(false);
+    }
   }, []);
 
+  if (error) {
+    return (
+      <div style={{ 
+        width: '100vw', 
+        height: '100vh', 
+        background: 'black', 
+        display: 'flex', 
+        flexDirection: 'column',
+        alignItems: 'center', 
+        justifyContent: 'center',
+        color: '#dc2626',
+        fontFamily: '"Star Jedi", "Arial Black", Arial, sans-serif'
+      }}>
+        <div style={{ fontSize: '24px', marginBottom: '20px' }}>GALAXY MAP ERROR</div>
+        <div style={{ fontSize: '16px', marginBottom: '30px', textAlign: 'center' }}>{error}</div>
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            background: '#dc2626',
+            color: 'white',
+            border: 'none',
+            padding: '12px 24px',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            fontSize: '16px'
+          }}
+        >
+          RELOAD MAP
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div ref={mountRef} style={{ width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative', background: 'black' }}>
+    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative', background: 'black' }}>
+      {/* Navigation Header */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 1000,
+        background: 'linear-gradient(180deg, rgba(0,0,0,0.8) 0%, transparent 100%)',
+        padding: '20px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <div style={{
+          fontFamily: '"Star Jedi", "Arial Black", Arial, sans-serif',
+          color: '#ffe81f',
+          fontSize: '28px',
+          letterSpacing: '2px',
+          textShadow: '0 0 10px #ffe81f'
+        }}>
+          GALAXY MAP
+        </div>
+        <button
+          onClick={() => navigate('/')}
+          style={{
+            background: '#dc2626',
+            color: 'white',
+            border: '2px solid #dc2626',
+            borderRadius: '8px',
+            padding: '12px 24px',
+            cursor: 'pointer',
+            fontFamily: '"Star Jedi", "Arial Black", Arial, sans-serif',
+            fontSize: '16px',
+            letterSpacing: '1px',
+            transition: 'all 0.2s',
+            boxShadow: '0 0 10px rgba(220, 38, 38, 0.5)'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.05)';
+            e.currentTarget.style.boxShadow = '0 0 20px rgba(220, 38, 38, 0.8)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = '0 0 10px rgba(220, 38, 38, 0.5)';
+          }}
+        >
+          RETURN TO BASE
+        </button>
+      </div>
+
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'black',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 999
+        }}>
+          <div style={{
+            fontFamily: '"Star Jedi", "Arial Black", Arial, sans-serif',
+            color: '#ffe81f',
+            fontSize: '24px',
+            marginBottom: '20px',
+            textAlign: 'center'
+          }}>
+            INITIALIZING GALAXY MAP
+          </div>
+          <div style={{
+            width: '200px',
+            height: '4px',
+            background: '#333',
+            borderRadius: '2px',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              width: '100%',
+              height: '100%',
+              background: 'linear-gradient(90deg, #ffe81f, #dc2626)',
+              animation: 'loading 2s infinite'
+            }} />
+          </div>
+        </div>
+      )}
+
+      {/* 3D Scene Container */}
+      <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
+
+      {/* Character Info Tooltip */}
       {hovered && hoveredPosition && (() => {
         const character = CHARACTERS.find(c => c.name === hovered);
         if (!character) return null;
-        // Faction color mapping with index signature
+        
         const factionColors: { [key: string]: string } = {
           'Empire': '#dc2626',
           'Jedi Order': '#22c55e',
@@ -394,16 +576,19 @@ const GalaxyMap: React.FC = () => {
           'Republic': '#f59e42',
           'default': '#ef4444'
         };
+        
         let mainColor = factionColors['default'];
         if (typeof character.faction === 'string' && factionColors[character.faction as string]) {
           mainColor = factionColors[character.faction as string];
         }
+        
         const powerBarColor = character.weapon && character.weapon.toLowerCase().includes('red') ? '#dc2626' : mainColor;
+        
         return (
           <div style={{
             position: 'absolute',
-            left: hoveredPosition.x + 10,
-            top: hoveredPosition.y - 10,
+            left: Math.min(hoveredPosition.x + 10, window.innerWidth - 350),
+            top: Math.max(hoveredPosition.y - 10, 100),
             background: 'rgba(10,10,20,0.98)',
             color: mainColor,
             border: `2.5px solid ${mainColor}`,
@@ -418,6 +603,7 @@ const GalaxyMap: React.FC = () => {
             textShadow: `0 0 8px ${mainColor}, 0 0 16px #000`,
             backdropFilter: 'blur(8px)',
             minWidth: '340px',
+            maxWidth: '400px',
             textAlign: 'left',
             transition: 'all 0.2s cubic-bezier(.4,2,.6,1)',
             borderImage: `linear-gradient(90deg, ${mainColor} 0%, #fff 100%) 1`,
@@ -484,6 +670,33 @@ const GalaxyMap: React.FC = () => {
           </div>
         );
       })()}
+
+      {/* Instructions */}
+      <div style={{
+        position: 'absolute',
+        bottom: '20px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        background: 'rgba(0,0,0,0.7)',
+        color: '#ffe81f',
+        padding: '12px 24px',
+        borderRadius: '8px',
+        fontFamily: '"Star Jedi", "Arial Black", Arial, sans-serif',
+        fontSize: '14px',
+        letterSpacing: '1px',
+        textAlign: 'center',
+        zIndex: 1000
+      }}>
+        HOVER OVER CHARACTERS • DRAG TO ROTATE • SCROLL TO ZOOM
+      </div>
+
+      {/* CSS for loading animation */}
+      <style>{`
+        @keyframes loading {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+      `}</style>
     </div>
   );
 };
