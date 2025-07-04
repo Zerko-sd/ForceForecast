@@ -34,13 +34,7 @@ Changes the entire app theme to a dark red gradient
 Plays the Imperial March music
 Adds a subtle Darth Vader background overlay
 Enhances contrast and saturation for a more dramatic look
-2. "beep boop"
-Effect: Activates Droid Mode
-What happens:
-Plays droid sound effects
-Transforms all text on the screen to "BEEP BOOP ZWEE BOP BEEP!" for 5 seconds
-Creates a fun droid-speaking experience
-�� How to Access:
+## How to Access:
 Find the secret input field - It appears in the empty state when you haven't entered a mission directive yet
 Look for the placeholder - "Type a secret command..."
 Type one of the commands and press Enter
