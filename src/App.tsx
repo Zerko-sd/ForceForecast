@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PromptInput } from './components/PromptInput';
 import { Schedule } from './components/Schedule';
@@ -15,6 +15,14 @@ import { DailyPlan, GeneratedContent } from './types';
 import { Skull, MessageSquare, Gamepad2, Calendar as CalendarIcon, Timer } from 'lucide-react';
 import DarthVader from './components/icons/DarthVader';
 import yodaImg from '../public/assets/yoda.png'; // Will work with Vite/CRA, else use <img src="/assets/yoda.png" />
+import { Link } from 'react-router-dom';
+import { TimelineSlider } from './components/TimelineSlider';
+
+// Easter egg assets
+const VADER_MASK = '/assets/vader.png';
+const IMPERIAL_MARCH = '/assets/Imperial-March.mp3';
+const DROID_SOUND = '/assets/droid.mp3';
+const VADER_BREATH = '/assets/vader-breath.mp3';
 
 function App() {
   const [isLoading, setIsLoading] = useState(false);
@@ -27,6 +35,15 @@ function App() {
   const [showResults, setShowResults] = useState(false);
   const [lightsaberCursor, setLightsaberCursor] = useState(false);
   const [yodaMode, setYodaMode] = useState(false);
+  const [easterEggInput, setEasterEggInput] = useState('');
+  const [vaderMode, setVaderMode] = useState(false);
+  const [droidSpeak, setDroidSpeak] = useState(false);
+  const [showVaderBreath, setShowVaderBreath] = useState(false);
+  const [droidClicks, setDroidClicks] = useState(0);
+  const idleTimer = useRef<NodeJS.Timeout | null>(null);
+  const imperialMarchRef = useRef<HTMLAudioElement>(null);
+  const droidSoundRef = useRef<HTMLAudioElement>(null);
+  const vaderBreathRef = useRef<HTMLAudioElement>(null);
 
   const handlePromptSubmit = async (prompt: string) => {
     setIsLoading(true);
@@ -223,8 +240,115 @@ function App() {
     return text.split(' ').reverse().join(' ');
   }
 
+  // Idle detection for Vader breathing
+  useEffect(() => {
+    function resetIdle() {
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+      setShowVaderBreath(false);
+      if (vaderBreathRef.current) {
+        vaderBreathRef.current.pause();
+        vaderBreathRef.current.currentTime = 0;
+      }
+      idleTimer.current = setTimeout(() => {
+        setShowVaderBreath(true);
+        if (vaderBreathRef.current) {
+          vaderBreathRef.current.currentTime = 0;
+          vaderBreathRef.current.play();
+        }
+      }, 30000);
+    }
+    window.addEventListener('mousemove', resetIdle);
+    window.addEventListener('keydown', resetIdle);
+    window.addEventListener('mousedown', resetIdle);
+    window.addEventListener('touchstart', resetIdle);
+    resetIdle();
+    return () => {
+      window.removeEventListener('mousemove', resetIdle);
+      window.removeEventListener('keydown', resetIdle);
+      window.removeEventListener('mousedown', resetIdle);
+      window.removeEventListener('touchstart', resetIdle);
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+    };
+  }, []);
+
+  // Handle Easter egg input
+  useEffect(() => {
+    if (easterEggInput.toLowerCase() === 'dark side') {
+      setVaderMode(true);
+      if (imperialMarchRef.current) {
+        imperialMarchRef.current.currentTime = 0;
+        imperialMarchRef.current.play();
+      }
+      setEasterEggInput('');
+    } else if (easterEggInput.toLowerCase() === 'beep boop') {
+      setDroidSpeak(true);
+      if (droidSoundRef.current) {
+        droidSoundRef.current.currentTime = 0;
+        droidSoundRef.current.play();
+      }
+      setTimeout(() => setDroidSpeak(false), 5000);
+      setEasterEggInput('');
+    }
+  }, [easterEggInput]);
+
+  // Droid icon click handler
+  function handleDroidClick() {
+    setDroidClicks(c => {
+      if (c + 1 >= 5) {
+        setDroidSpeak(true);
+        if (droidSoundRef.current) {
+          droidSoundRef.current.currentTime = 0;
+          droidSoundRef.current.play();
+        }
+        setTimeout(() => setDroidSpeak(false), 5000);
+        return 0;
+      }
+      return c + 1;
+    });
+  }
+
+  // Replace all text with droid speak if droidSpeak is true
+  function droidify(children) {
+    if (!droidSpeak) return children;
+    // Recursively replace all text nodes with droid speak
+    if (typeof children === 'string') return 'BEEP BOOP ZWEE BOP BEEP!';
+    if (Array.isArray(children)) return children.map(droidify);
+    if (children && typeof children === 'object' && children.props && children.props.children) {
+      return React.cloneElement(children, children.props, droidify(children.props.children));
+    }
+    return children;
+  }
+
+  // Vader mode theme
+  const vaderTheme = vaderMode ? {
+    background: 'linear-gradient(135deg, #1a0000 0%, #3a0000 100%)',
+    color: '#ff2a2a',
+    minHeight: '100vh',
+    filter: 'contrast(1.1) saturate(1.2)',
+    transition: 'background 0.5s',
+    position: 'relative',
+  } : { position: 'relative' };
+
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="min-h-screen relative overflow-hidden" style={vaderTheme}>
+      {/* Subtle Vader SVG background */}
+      {vaderMode && (
+        <div style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '80vw',
+          maxWidth: 700,
+          height: 'auto',
+          opacity: 0.08,
+          zIndex: 0,
+          pointerEvents: 'none',
+          filter: 'blur(0.5px)',
+        }}>
+          <DarthVader width="100%" height="100%" />
+        </div>
+      )}
       {/* Yoda Easter Egg */}
       {yodaMode && (
         <img
@@ -828,11 +952,44 @@ function App() {
                       </p>
                     </motion.div>
                   </motion.div>
+                  <motion.div 
+                    className="w-full flex justify-center mt-6"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    transition={{ duration: 0.5 }}
+                  >
+                    <input
+                      type="text"
+                      value={easterEggInput}
+                      onChange={e => setEasterEggInput(e.target.value)}
+                      placeholder="Type a secret command..."
+                      style={{
+                        width: 320,
+                        padding: '12px 20px',
+                        fontSize: 16,
+                        borderRadius: 12,
+                        border: '2.5px solid #ff2a2a',
+                        background: 'rgba(10,10,20,0.98)',
+                        color: '#ff2a2a',
+                        fontFamily: 'Star Jedi, Arial Black, Arial',
+                        letterSpacing: 2,
+                        boxShadow: '0 0 32px #ff2a2a55, 0 0 80px #000',
+                        outline: 'none',
+                        textAlign: 'center',
+                        marginTop: 12,
+                      }}
+                      aria-label="Easter Egg Command Bar"
+                    />
+                  </motion.div>
                 </motion.div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
+
+        {/* Timeline Slider - Star Wars themed, vertical, animated */}
+        <TimelineSlider />
 
         {/* Footer */}
         <motion.div 
@@ -882,6 +1039,31 @@ function App() {
         isOpen={isPomodoroOpen}
         onClose={() => setIsPomodoroOpen(false)}
       />
+
+      {/* Audio elements */}
+      <audio ref={imperialMarchRef} src={IMPERIAL_MARCH} />
+      <audio ref={droidSoundRef} src={DROID_SOUND} />
+      <audio ref={vaderBreathRef} src={VADER_BREATH} loop />
+      {/* Vader breathing overlay */}
+      {showVaderBreath && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(0,0,0,0.7)',
+          zIndex: 3000,
+          pointerEvents: 'none',
+        }} />
+      )}
+      {/* Main content, droidified if needed */}
+      {droidify(
+        <div style={{ padding: 32, fontFamily: 'Star Jedi, Arial Black, Arial', fontSize: 28 }}>
+          Welcome to the Star Wars App!
+          {/* ...rest of your main content... */}
+        </div>
+      )}
     </div>
   );
 }
